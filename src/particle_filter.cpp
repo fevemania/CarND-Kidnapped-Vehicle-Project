@@ -53,11 +53,18 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   normal_distribution<double> noise_y(0.0, std_pos[1]);
   normal_distribution<double> noise_theta(0.0, std_pos[2]);
 
-  for (auto& particle : particles) {
-    double pred_theta = particle.theta + yaw_rate * delta_t;
-    particle.x += (velocity / yaw_rate) * ( sin(pred_theta) - sin(particle.theta) ) + noise_x(dre);
-    particle.y += (velocity / yaw_rate) * ( cos(particle.theta) - cos(pred_theta) ) + noise_y(dre);
-    particle.theta = pred_theta + noise_theta(dre);
+  if (fabs(yaw_rate) < 0.00001) {
+    for (auto& particle : particles) {
+      particle.x += velocity * delta_t * cos(particle.theta);
+      particle.y += velocity * delta_t * sin(particle.theta);
+    }
+  } else {
+    for (auto& particle : particles) {
+      double pred_theta = particle.theta + yaw_rate * delta_t;
+      particle.x += (velocity / yaw_rate) * ( sin(pred_theta) - sin(particle.theta) ) + noise_x(dre);
+      particle.y += (velocity / yaw_rate) * ( cos(particle.theta) - cos(pred_theta) ) + noise_y(dre);
+      particle.theta = pred_theta + noise_theta(dre);
+    }
   }
 }
 
@@ -89,6 +96,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
     // initial weight
     double weight = 1.0;
+    double var_x = pow(std_landmark[0], 2);
+    double var_y = pow(std_landmark[1], 2);
+    double covar_xy = std_landmark[0] * std_landmark[1];
 
     for (int j = 0; j < observations.size(); ++j) {
       // Step1. translate car sensor landmark obs from VEHICLE's coordinate system to MAP's coordinate system
@@ -109,12 +119,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       }
 
       // Step3. calculate particle's weight
-      double var_x = pow(std_landmark[0], 2);
-      double var_y = pow(std_landmark[1], 2);
-      double covar_xy = std_landmark[0] * std_landmark[1];
-
       double exponent = (min_distance * min_distance / 2 * var_x * var_y);
-
       // final weight is the multiplication of all calculated measurement probabilities from observations.
       weight *= (exp(-exponent) / 2*M_PI * covar_xy);
     }
